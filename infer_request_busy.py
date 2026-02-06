@@ -44,12 +44,25 @@ def main():
     request = compiled.create_infer_request()
     request.start_async({input_key: dummy})
 
+    print("Started first async infer.")
     # Immediately start again while the request is still running.
-    # This is expected to raise a RuntimeError with "Infer Request is Busy".
-    request.start_async({input_key: dummy})
-
-    # If it didn't error (unlikely), wait to clean up.
-    request.wait()
+    # If it raises "Infer Request is Busy", cancel the in-flight request.
+    try:
+        print("Trying second start_async (expecting busy)...")
+        request.start_async({input_key: dummy})
+        print("Second start_async succeeded (unexpected).")
+    except RuntimeError as exc:
+        msg = str(exc)
+        if "infer request is busy" in msg.lower():
+            print("Condition hit: Infer Request is Busy -> cancel()")
+            request.cancel()
+        else:
+            raise
+    finally:
+        # Ensure request is not left running.
+        print("Waiting for request to finish/cleanup...")
+        request.wait()
+        print("Request finished.")
 
 
 if __name__ == "__main__":
