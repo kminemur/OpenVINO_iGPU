@@ -1,0 +1,4 @@
+openvino-dev
+torch
+torchvision
+transformers
