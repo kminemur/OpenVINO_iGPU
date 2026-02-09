@@ -35,6 +35,18 @@ def main() -> None:
         default="OpenVINO makes model deployment faster.",
         help="Sample text used to build tracing input",
     )
+    parser.add_argument(
+        "--fixed-batch",
+        type=int,
+        default=1,
+        help="Fixed batch size for exported IR. NPU requires bounded/static shapes.",
+    )
+    parser.add_argument(
+        "--fixed-seq-len",
+        type=int,
+        default=8,
+        help="Fixed sequence length for exported IR. NPU requires bounded/static shapes.",
+    )
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir)
@@ -53,6 +65,15 @@ def main() -> None:
 
     with torch.no_grad():
         ov_model = ov.convert_model(traceable_model, example_input=example_input)
+
+    # NPU compiler does not accept unbounded dynamic dimensions for this model.
+    # Force static shapes for tokenizer inputs so benchmark_app can compile on NPU.
+    ov_model.reshape(
+        {
+            "input_ids": [args.fixed_batch, args.fixed_seq_len],
+            "attention_mask": [args.fixed_batch, args.fixed_seq_len],
+        }
+    )
 
     ir_path = output_dir / f"{args.ir_name}.xml"
     ov.save_model(ov_model, str(ir_path))
