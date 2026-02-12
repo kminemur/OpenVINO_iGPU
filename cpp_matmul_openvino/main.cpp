@@ -50,6 +50,7 @@ int main(int argc, char* argv[]) {
         const std::size_t m = (argc > 2) ? parse_dim(argv[2], "M") : 2;
         const std::size_t k = (argc > 3) ? parse_dim(argv[3], "K") : 3;
         const std::size_t n = (argc > 4) ? parse_dim(argv[4], "N") : 4;
+        const std::size_t cpu_loops = (argc > 5) ? parse_dim(argv[5], "CPU_LOOPS") : 1;
 
         auto a = std::make_shared<ov::opset10::Parameter>(ov::element::f32, ov::Shape{m, k});
         a->set_friendly_name("A");
@@ -81,7 +82,10 @@ int main(int argc, char* argv[]) {
         const ov::Tensor y = req.get_output_tensor(0);
         const float* y_ptr = y.data<const float>();
 
-        const std::vector<float> reference = cpu_matmul(a_data, b_data, m, k, n);
+        std::vector<float> reference;
+        for (std::size_t i = 0; i < cpu_loops; ++i) {
+            reference = cpu_matmul(a_data, b_data, m, k, n);
+        }
         float max_abs_diff = 0.0f;
         for (std::size_t i = 0; i < reference.size(); ++i) {
             max_abs_diff = std::max(max_abs_diff, std::fabs(reference[i] - y_ptr[i]));
@@ -89,6 +93,7 @@ int main(int argc, char* argv[]) {
 
         std::cout << "Device: " << device << "\n";
         std::cout << "Shape: A[" << m << "x" << k << "] * B[" << k << "x" << n << "]\n";
+        std::cout << "CPU reference loops: " << cpu_loops << "\n";
         std::cout << "Max abs diff vs CPU reference: " << max_abs_diff << "\n";
 
         const std::size_t print_rows = std::min<std::size_t>(m, 4);
@@ -104,8 +109,8 @@ int main(int argc, char* argv[]) {
         return 0;
     } catch (const std::exception& ex) {
         std::cerr << "Error: " << ex.what() << "\n";
-        std::cerr << "Usage: matmul_openvino [DEVICE] [M] [K] [N]\n";
-        std::cerr << "Example: matmul_openvino GPU 256 512 128\n";
+        std::cerr << "Usage: matmul_openvino [DEVICE] [M] [K] [N] [CPU_LOOPS]\n";
+        std::cerr << "Example: matmul_openvino GPU 256 512 128 10\n";
         return 1;
     }
 }
